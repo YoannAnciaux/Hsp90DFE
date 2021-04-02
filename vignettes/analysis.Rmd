@@ -1,0 +1,123 @@
+---
+title: "analysis"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{analysis}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+```{r setup}
+library(devtools)
+library(tidyverse)
+library(here)
+load_all()
+```
+
+Load the data and tranform the data ito matrx format which is the input format for the fitting functions.
+Also removes the data with NA.
+```{r}
+data("data_DFE")
+
+# Tranforms the selection coefficients to a matrix format
+tmp_s <- data_DFE %>%
+  pivot_wider(-c(mean_sd), names_from = "Environment", values_from = "mean_s") %>%
+  unite(name, c("Position", "AA"))
+s_noNA <- matrix(unlist(tmp_s[-1]), ncol = length(tmp_s)-1, byrow = F, dimnames = list(unlist(tmp_s[,1]), names(tmp_s)[-1]))
+
+# Tranforms the sd of the error to a matrix format
+tmp_sd <- data_DFE %>%
+  pivot_wider(-c(mean_s), names_from = "Environment", values_from = "mean_sd") %>%
+  unite(name, c("Position", "AA"))
+sd_noNA <- matrix(unlist(tmp_sd[-1]), ncol = length(tmp_sd)-1, byrow = F, dimnames = list(unlist(tmp_sd[,1]), names(tmp_sd)[-1]))
+```
+
+Fit parameters with the classic FGM called "Martin" in the function options.
+A maximum number of dimensions must be set for te fit of the FGM. This parameter is important for the prediction of the fitness of the mutations across the environments. If n is too high in one of the environment there is too much dimensions in which the phenotypes of the mutants will be positionned compared to the number of environents available in the data. If we have $x$ environment $(e_{1}, ..., e_{x})$, and we want to predict the fitnesses of some mutations in environment $e_{x}$ from their fitnesses in $(e_{1}, ..., e_{x-1})$, we have $x-1$ point of references to use for trilateration of the phenotype in a euclidian space of $x-1-1=x-2$ dimensions.
+```{r}
+
+envs <- colnames(s_noNA) #vector with the names of each environment for which the fit must be performed
+nmax = ncol(s_noNA)-2 #maximum number of dimensions in the fit of the FGM. 
+model = "Martin" #classic FGM form corresponding to a quadratic funtcion for the fitness.
+method = "NM" #method for the fit of the likelihood funtion (NM = Nelder-Mead)
+round_n = T #the number of dimension n in the FGM must be a natural number. However the fittig function returns real numbers so this option round the dimensons and rerun the fit with a fixed round dimensions from the firts fit.
+bounds = list(n = c(0.9, nmax+0.1)) #bound for the parameters. Here only n is bounded between 1 and nmax.
+iterlim = 5000 #number of iteration in the fitting algorithm
+fit <- list() #initialization of the list containing the fit results
+s <- s_noNA #simplification of the names of the variable for readability
+sd <- sd_noNA
+
+ss <- split(s, col(s, as.factor = T))
+ssd <- split(sd, col(s, as.factor = T))
+temp <- sapply(ss,
+               simplify = F,
+               USE.NAMES = T,
+               function(x) which(x > quantile(x, 0.15)))
+ss <- mapply(FUN = function(x, y) x[y],
+             ss, temp,
+             SIMPLIFY = F,
+             USE.NAMES = T
+             )
+
+ssd <-  mapply(FUN = function(x, y) x[y],
+             ssd, temp,
+             SIMPLIFY = F,
+             USE.NAMES = T
+             )
+
+
+#fit the parameters and also keep the information of the fit about the convergence, the log-likelihood...
+fit$raw_parameters <- mapply(FUN = fit_DFE,
+                             s = ss,
+                             sd = ssd,
+                             MoreArgs = list(model = model, method = method, round_n = round_n, bounds = bounds, iterlim = iterlim, nmax = nmax),
+                             SIMPLIFY = F,
+                             USE.NAMES = T)
+
+#extract only the estimates for ease of use in the following.
+fit$parameters <- sapply(X = fit$raw_parameters,
+                         simplify = T,
+                         USE.NAMES = T,
+                         FUN = function(e) e$estimate)
+
+#add the extra parameters of the "Tenaillon"" version of FGM which are fixed in the "Martin" version at Q=2 and alpha=1/2
+fit$parameters <- rbind(fit$parameters,
+                        alpha = rep(1/2, ncol(fit$parameters)),
+                        Q = rep(2, ncol(fit$parameters)))
+# split the parameters matrix in a list by parameter for ease of use in the following
+fit$parameters <- split(fit$parameters, row(fit$parameters, as.factor = T))
+fit$parameters <- sapply(X = fit$parameters,
+                         simplify = F,
+                         USE.NAMES = T,
+                         FUN = function(p) {names(p) <- colnames(s); p})
+```
+
+```{r}
+grid <- seq(min(s), max(s), length = 100)
+dfe <- sapply(X = envs,
+              simplify = F,
+              USE.NAMES = T,
+              FUN = function(e) {
+                dist_estim = tibble(environment = rep(e, length(grid)),
+                                    s = grid,
+                                    density = dfgm_martin(grid, fit$parameters$n[e], fit$parameters$lambda[e], fit$parameters$so[env]))
+              }) %>%
+  bind_rows()
+
+ggplot() +
+      geom_density(aes(x = mean_s, color = "1"), data = data_DFE) +
+      geom_line(aes(x = s, y = density, color = "2"), data = dfe) +
+      theme(legend.position = c(1, 0), legend.justification = c(1.1, 0.15)) +
+      xlab("selection coefficients") +
+      scale_color_manual(name = "DFE", breaks = c("1","2"), labels = c("data", "Fit FGM on 85% of data"), values = c("#000000","#D55E00")) +
+      facet_wrap(~ environment, scales = "free")
+
+```
+
