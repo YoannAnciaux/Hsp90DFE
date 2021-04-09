@@ -1,0 +1,17 @@
+---
+title: "Visuals marginal DFEs"
+author: "TB"
+date: "4/9/2021, last update on `r Sys.time()` "
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Load data and data fits
+```{r}
+load_all()
+readRDS("../")
+```
+

@@ -105,7 +105,6 @@ Note by TB  --> need an explanation here ... no idea what is going on ?
 
 ```{r}
 fit$parameters
-
 ```
 
 ```{r}
@@ -128,5 +127,12 @@ ggplot() +
       scale_color_manual(name = "DFE", breaks = c("1","2"), labels = c("data", "Fit FGM on 85% of data"), values = c("#000000","#D55E00")) +
       facet_wrap(~ environment, scales = "free")
 
+```
+
+# Exporting the fitted distributions 
+We save the `dfe` and `fit` as an rds objects for future extra analysis / use and visuals
+```{r}
+saveRDS(object = fit, file = "../output/fitted_dfes_details.rds")
+saveRDS(object = dfe, file = "../output/fitted_dfes_marginal_densities.rds")
 ```
 
