@@ -18,13 +18,15 @@ knitr::opts_chunk$set(
 library(devtools)
 library(tidyverse)
 library(here)
-load_all()
+load_all() #note TB not sure this is enough I need to also source()
+source(file = "../R/fit_DFE.R")
 ```
 
-Load the data and tranform the data ito matrx format which is the input format for the fitting functions.
+Loads the data and transform the data into a matrix format which is the input format for the fitting functions.
 Also removes the data with NA.
 ```{r}
 data("data_DFE")
+dim(data_DFE) # just a check on the dimension
 
 # Tranforms the selection coefficients to a matrix format
 tmp_s <- data_DFE %>%
@@ -32,7 +34,7 @@ tmp_s <- data_DFE %>%
   unite(name, c("Position", "AA"))
 s_noNA <- matrix(unlist(tmp_s[-1]), ncol = length(tmp_s)-1, byrow = F, dimnames = list(unlist(tmp_s[,1]), names(tmp_s)[-1]))
 
-# Tranforms the sd of the error to a matrix format
+# Transforms the sd of the error to a matrix format
 tmp_sd <- data_DFE %>%
   pivot_wider(-c(mean_s), names_from = "Environment", values_from = "mean_sd") %>%
   unite(name, c("Position", "AA"))
@@ -40,7 +42,7 @@ sd_noNA <- matrix(unlist(tmp_sd[-1]), ncol = length(tmp_sd)-1, byrow = F, dimnam
 ```
 
 Fit parameters with the classic FGM called "Martin" in the function options.
-A maximum number of dimensions must be set for te fit of the FGM. This parameter is important for the prediction of the fitness of the mutations across the environments. If n is too high in one of the environment there is too much dimensions in which the phenotypes of the mutants will be positionned compared to the number of environents available in the data. If we have $x$ environment $(e_{1}, ..., e_{x})$, and we want to predict the fitnesses of some mutations in environment $e_{x}$ from their fitnesses in $(e_{1}, ..., e_{x-1})$, we have $x-1$ point of references to use for trilateration of the phenotype in a euclidian space of $x-1-1=x-2$ dimensions.
+A maximum number of dimensions must be set for the fit of the FGM. This parameter is important for the prediction of the fitness of the mutations across the environments. If n is too high in one of the environment there is too much dimensions in which the phenotypes of the mutants will be positioned compared to the number of environments available in the data. If we have $x$ environment $(e_{1}, ..., e_{x})$, and we want to predict the fitnesses of some mutations in environment $e_{x}$ from their fitnesses in $(e_{1}, ..., e_{x-1})$, we have $x-1$ point of references to use for trilateration of the phenotype in a euclidian space of $x-1-1=x-2$ dimensions.
 ```{r}
 
 envs <- colnames(s_noNA) #vector with the names of each environment for which the fit must be performed
@@ -49,7 +51,7 @@ model = "Martin" #classic FGM form corresponding to a quadratic funtcion for the
 method = "NM" #method for the fit of the likelihood funtion (NM = Nelder-Mead)
 round_n = T #the number of dimension n in the FGM must be a natural number. However the fittig function returns real numbers so this option round the dimensons and rerun the fit with a fixed round dimensions from the firts fit.
 bounds = list(n = c(0.9, nmax+0.1)) #bound for the parameters. Here only n is bounded between 1 and nmax.
-iterlim = 5000 #number of iteration in the fitting algorithm
+iterlim = 500 #number of iteration in the fitting algorithm (previously 5000)
 fit <- list() #initialization of the list containing the fit results
 s <- s_noNA #simplification of the names of the variable for readability
 sd <- sd_noNA
@@ -99,6 +101,13 @@ fit$parameters <- sapply(X = fit$parameters,
                          FUN = function(p) {names(p) <- colnames(s); p})
 ```
 
+Note by TB  --> need an explanation here ... no idea what is going on ?
+
+```{r}
+fit$parameters
+
+```
+
 ```{r}
 grid <- seq(min(s), max(s), length = 100)
 dfe <- sapply(X = envs,
@@ -107,7 +116,7 @@ dfe <- sapply(X = envs,
               FUN = function(e) {
                 dist_estim = tibble(environment = rep(e, length(grid)),
                                     s = grid,
-                                    density = dfgm_martin(grid, fit$parameters$n[e], fit$parameters$lambda[e], fit$parameters$so[env]))
+                                    density = dfgm_martin(grid, fit$parameters$n[e], fit$parameters$lambda[e], fit$parameters$so[e]))
               }) %>%
   bind_rows()
 
