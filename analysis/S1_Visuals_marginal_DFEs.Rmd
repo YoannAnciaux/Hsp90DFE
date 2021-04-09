@@ -9,9 +9,30 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+# Init 
+```{r}
+library(tidyverse)
+```
+
 # Load data and data fits
 ```{r}
-load_all()
-readRDS("../")
+getwd()
+data_DFE <- readRDS("output/data_DFE.rds")
+fit <-readRDS("output/fitted_dfes_details.rds")
+dfe <-readRDS("output/fitted_dfes_marginal_densities.rds")
+```
+
+# redoing Yoann's figure
+(8)just as internal consistency check)
+
+```{r}
+ggplot() +
+      geom_density(aes(x = mean_s, color = "1"), data = data_DFE) +
+      geom_line(aes(x = s, y = density, color = "2"), data = dfe) +
+      theme(legend.position = c(1, 0), legend.justification = c(1.1, 0.15)) +
+      xlab("selection coefficients") +
+      scale_color_manual(name = "DFE", breaks = c("1","2"), labels = c("data", "Fit FGM on 85% of data"), values = c("#000000","#D55E00")) +
+      facet_wrap(~ environment, scales = "free")
+
 ```
 
