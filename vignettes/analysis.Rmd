@@ -134,5 +134,7 @@ We save the `dfe` and `fit` as an rds objects for future extra analysis / use an
 ```{r}
 saveRDS(object = fit, file = "../output/fitted_dfes_details.rds")
 saveRDS(object = dfe, file = "../output/fitted_dfes_marginal_densities.rds")
+saveRDS(object = data_DFE, file = "../output/data_DFE.rds")
+
 ```
 
